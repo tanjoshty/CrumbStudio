@@ -3,12 +3,13 @@
 
 -- Capacity pools — how many cakes each pool can fulfil per week.
 -- Mon–Thu share ONE pool (one cake across the whole block); Fri/Sat/Sun are their own.
--- Numbers are placeholders — set them to the real capacity.
+-- Real capacity as of 2026-08-20. The baker will edit these from the admin
+-- panel (Phase 6); until then, change them here and re-run.
 INSERT INTO capacity_pool (key, max_items) VALUES
   ('mon_thu', 1),
-  ('fri', 3),
-  ('sat', 4),
-  ('sun', 3)
+  ('fri', 2),
+  ('sat', 3),
+  ('sun', 2)
 ON CONFLICT (key) DO UPDATE SET max_items = EXCLUDED.max_items;
 
 -- Weekday → pool mapping. 0 = Mon, 1 = Tue, … 6 = Sun.
