@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
+import { format, parseISO } from "date-fns"
 
-import { CartItem } from "@/types/cart.types"
 import { useCartStore } from "@/store/useCartStore"
 
 interface CheckoutFormProps {
@@ -17,21 +17,13 @@ export function CheckoutForm({onPlaceOrder }: CheckoutFormProps) {
   const [fulfillment, setFulfillment] = useState<"pickup" | "delivery">("pickup")
   const isEmpty = cartItems.length === 0
 
-  useEffect(() => {
-    async function fetchData() {
-      const res = await fetch('/api/checkout', {
-        method: "POST",
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message: 'Hello from client' }),
-      });
-      const data = await res.json()
-      console.log("data: ", data)
-      return data;
-    }
-    fetchData()
-  }, [])
+  // NOTE: the payment fields below are still the visual placeholder, and
+  // nothing here creates a Checkout Session yet — Phase 3 replaces this with
+  // Stripe's embedded form, calling POST /api/checkout once on submit.
+  //
+  // The previous version fired that POST from an effect keyed on the cart,
+  // which was harmless against a stub but would now mint a pending order and
+  // burn a capacity hold on every cart change.
 
   return (
     <div className="bg-cream text-ink min-h-screen">
@@ -117,7 +109,9 @@ export function CheckoutForm({onPlaceOrder }: CheckoutFormProps) {
                         .join(" · ")}
                     </p>
                     {item.deliveryDate && (
-                      <p className="text-[13px] text-ink/75">{item.deliveryDate}</p>
+                      <p className="text-[13px] text-ink/75">
+                        {format(parseISO(item.deliveryDate), "EEE d MMM yyyy")}
+                      </p>
                     )}
                     {item.notes && (
                       <p className="text-[13px] italic text-ink/55 mt-0.5">“{item.notes}”</p>

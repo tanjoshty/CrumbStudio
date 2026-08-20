@@ -29,5 +29,11 @@ export const useCartStore = create<CartStore>()(
   {
     name: 'cart-storage',
     partialize: (state) => ({ cartItems: state.cartItems, total: state.total }),
+    // v1 lines carry no sizeKey and a `toDateString()` date, so checkout cannot
+    // price or schedule them. There is no way to recover the missing size _key
+    // from a label, so persisted v1 carts are dropped rather than migrated into
+    // lines that would fail server-side with a confusing error.
+    version: 2,
+    migrate: () => ({ cartItems: [], total: 0 }),
   })
 )
