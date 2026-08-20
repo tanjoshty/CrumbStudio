@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=xgqjfkzkikdhgfvxfbty&read_only=true"
+    },
+    "sanity": {
+      "type": "http",
+      "url": "https://mcp.sanity.io"
+    },
+    "stripe": {
+      "type": "http",
+      "url": "https://mcp.stripe.com"
+    }
+  }
+}
