@@ -23,8 +23,14 @@ CREATE TABLE "order" (
   created_at       timestamptz      NOT NULL DEFAULT now(),
   fulfillment_type fulfillment_type NOT NULL,
   delivery_address text,  -- snapshot at checkout; null for pickup
+  stripe_session_id text UNIQUE,  -- the Stripe Checkout Session this order came from; the webhook's idempotency key
+  hold_expires_at  timestamptz,   -- while status = 'pending' this row IS the capacity hold; past this instant it stops consuming a slot, even if Stripe's `expired` event never arrived
   CHECK (fulfillment_type <> 'delivery' OR delivery_address IS NOT NULL)  -- delivery orders must have an address
 );
+
+-- A 'pending' order is a capacity hold written at checkout, not a real order.
+-- Capacity counts it only while hold_expires_at is in the future; every admin,
+-- reporting and email query must exclude 'pending' entirely.
 
 CREATE TABLE order_item (
   id                uuid           PRIMARY KEY DEFAULT gen_random_uuid(),

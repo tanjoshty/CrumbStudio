@@ -1,5 +1,7 @@
 "use client"
 
+import { format, parseISO } from "date-fns"
+
 import { X, Trash2, ShoppingBag } from "lucide-react"
 
 import { CartItem } from "@/types/cart.types"
@@ -68,7 +70,9 @@ export function Cart({
                       {item.variations.colour && (
                         <span>Colour: {item.variations.colour}</span>
                       )}
-                      {item.deliveryDate && <span>Date: {item.deliveryDate}</span>}
+                      {item.deliveryDate && (
+                        <span>Date: {format(parseISO(item.deliveryDate), 'EEE d MMM yyyy')}</span>
+                      )}
                       {item.notes && <span className="italic">“{item.notes}”</span>}
                     </div>
                   </div>

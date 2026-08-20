@@ -1,4 +1,5 @@
 'use client'
+import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Product } from '@/types/sanity.types';
 import { useProductPurchase } from './ProductPurchaseContext'
@@ -52,12 +53,15 @@ export function ProductVariants({
       lineId: crypto.randomUUID(),
       productId: id ?? '',
       price: selectedSize.price ?? 0,
+      sizeKey: selectedSize._key,
       variations: {
         size: selectedSize.label ?? '',
         flavour: selectedFlavour,
         colour: selectedColour,
       },
-      deliveryDate: date.toDateString(),
+      // yyyy-MM-dd, not toDateString(): this is compared against a Postgres
+      // `date` server-side, and formatting is the display layer's job.
+      deliveryDate: format(date, 'yyyy-MM-dd'),
       notes: notes ?? '',
       name: name ?? '',
     }
