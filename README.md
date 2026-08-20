@@ -81,6 +81,8 @@ Frontend env (`apps/frontend/.env.local`): Supabase URL/key, Sanity project id/d
 
 **Done:** product catalogue (Sanity schemas + Studio), storefront (PLP, PDP with gallery/variants/date picker), cart (Zustand + drawer), checkout UI, brand/design system, database schema design, guest-checkout modelling.
 
-**Next:** order-placement + capacity endpoints (`app/api/checkout`), Stripe embedded checkout + webhooks, confirmation email, admin order management, applying the schema to Supabase.
+**Next:** capacity + availability endpoint, order-placement (`app/api/checkout`), Stripe embedded checkout + webhooks, confirmation email, admin order management, deploy.
 
-See `docs/diary/` for the running log of decisions and rationale.
+The schema **is** applied to Supabase (all seven tables exist); `db/seed.sql` has not been run yet, so there is no capacity data.
+
+See `docs/plans/` for the phase-by-phase plan of the remaining work, and `docs/diary/` for the running log of decisions and rationale.

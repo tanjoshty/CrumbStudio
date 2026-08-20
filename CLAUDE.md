@@ -8,6 +8,10 @@ CrumbStudio is a cake ordering platform for a small, made-to-order home cake bus
 
 There is no separate backend service — an earlier Express app (`apps/backend`) was removed. All server logic lives in the Next app.
 
+## Plans
+
+`docs/plans/` holds the phase-by-phase plan for the remaining build — one file per phase, with an index and cross-cutting decisions in `docs/plans/README.md`. **Read the relevant phase doc before starting work on that phase**, and treat it as the source of truth for scope: it is edited by hand as scope changes, so it can be newer than this file. `docs/diary/` is the retrospective log; `docs/plans/` is the forward-looking one.
+
 ## Monorepo Structure
 
 pnpm workspaces:
@@ -73,7 +77,7 @@ DDL in `db/schema.sql`, run manually in the Supabase SQL editor (no migrations t
 - `order_item.unit_price` is a price snapshot (deliberately not a FK). `order_item.sanity_product_id` + a `variations` jsonb link a line to its Sanity product and chosen options (size/flavour/colour) — catalogue content stays in Sanity, no FK.
 - Fulfilment date is **per line item** (`order_item.fulfillment_date`); the `order` holds one `fulfillment_type` + a `delivery_address` snapshot (required for delivery, via CHECK).
 - `customer` supports guests: `user_id` is nullable (UNIQUE, so one row per registered user but unlimited guests), with a CHECK that a `user_id` or `email` is present.
-- Capacity is counted in **cakes per day**: `weekly_capacity.max_items` (recurring, day_of_week 0 = Mon) plus `capacity_override` (specific dates, `0` = closed).
+- Capacity is counted **per week, per pool** — not per day. `capacity_pool.max_items` is a weekly count; `weekly_capacity` maps weekday (0 = Mon) to a pool, so weekdays sharing a pool share one weekly slot (Mon–Thu share one in the seed). `capacity_override` changes a pool's count for one week (`week_start` = that Monday); `date_closure` closes a specific date outright. A date is bookable iff it is not closed **and** its pool has room that week.
 
 ## Payments & checkout flow
 
