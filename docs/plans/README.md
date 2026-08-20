@@ -13,8 +13,8 @@ entry.
 | # | Phase | Status | Blocks |
 |---|-------|--------|--------|
 | [1](./phase-1-capacity-availability.md) | Capacity & availability | **Done** 2026-08-20 | 2 |
-| [2](./phase-2-checkout-session.md) | Checkout API & slot reservation | Next — stub only | 3, 4 |
-| [3](./phase-3-embedded-checkout.md) | Stripe embedded checkout UI | Not started | 4 |
+| [2](./phase-2-checkout-session.md) | Checkout API & slot reservation | **Done** 2026-08-20 | 3, 4 |
+| [3](./phase-3-embedded-checkout.md) | Stripe embedded checkout UI | Next | 4 |
 | [4](./phase-4-webhooks-orders.md) | Webhooks & order lifecycle | Not started | 5, 6 |
 | [5](./phase-5-confirmation-email.md) | Confirmation email | Not started | — |
 | [6](./phase-6-admin.md) | Admin order management | Not started | — |
@@ -53,8 +53,15 @@ Verified against the live Supabase project and the working tree on 2026-08-18:
   returned `PGRST002 / 503` while direct SQL worked fine. Re-exposing `public`
   fixed it. Worth remembering: if `supabase-js` fails wholesale but the SQL
   editor is happy, check Exposed Schemas before debugging code.
-- `app/api/checkout/route.ts` is still a stub that logs the posted line items
-  and returns `{ message: "hi" }`.
+- Phase 2 shipped: `POST /api/checkout` prices from Sanity, holds the slot via
+  `place_order_hold`, and returns a Stripe client secret.
+- `db/functions.sql` holds the capacity + reservation SQL. Both `service.ts`
+  files read through it, so the calendar and the reservation share one
+  definition of "full".
+- Tests: `pnpm test` (vitest, 61 unit tests over the pure modules). Nothing in
+  the suite touches Postgres, Sanity or Stripe.
+- **Stripe's `ui_mode` is `embedded_page`**, not `embedded`, in SDK v22. Phase 3
+  needs the same value.
 - `CheckoutForm.tsx` posts to it from a `useEffect` and renders fake card
   fields. Both are placeholders to be replaced in phases 2–3.
 - Stripe: two accounts on this machine — `Crumb Studio sandbox`

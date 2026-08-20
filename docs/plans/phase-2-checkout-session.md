@@ -1,6 +1,6 @@
 # Phase 2 — Checkout API & slot reservation
 
-**Status:** In progress — `app/api/checkout/route.ts` is a stub
+**Status:** **Done** — 2026-08-20
 **Depends on:** Phase 1 (`assertCapacity`)
 **Blocks:** Phases 3, 4
 
@@ -93,18 +93,18 @@ can tie the webhook back. Target the sandbox account
 
 ## Tasks
 
-- [ ] Add `stripe_session_id text UNIQUE` and `hold_expires_at timestamptz` to
+- [x] Add `stripe_session_id text UNIQUE` and `hold_expires_at timestamptz` to
       `"order"` in `db/schema.sql`; apply the matching `ALTER TABLE`.
-- [ ] Add `sizeKey` to `CartItem` and set it in the PDP add-to-cart path.
-- [ ] Add a pricing projection to `lib/sanity/queries.ts`.
-- [ ] Add `lib/orders/service.ts` — validate → price → capacity → customer
+- [x] Add `sizeKey` to `CartItem` and set it in the PDP add-to-cart path.
+- [x] Add a pricing projection to `lib/sanity/queries.ts`.
+- [x] Add `lib/orders/service.ts` — validate → price → capacity → customer
       upsert → reserve → Stripe session, in one transaction where possible.
-- [ ] Rewrite `app/api/checkout/route.ts` to parse/validate the body, call the
+- [x] Rewrite `app/api/checkout/route.ts` to parse/validate the body, call the
       service, and return `{ clientSecret }`.
-- [ ] Re-check capacity inside the reservation write, not just before it — two
+- [x] Re-check capacity inside the reservation write, not just before it — two
       concurrent checkouts must not both take the last slot. A unique constraint
       or `SELECT … FOR UPDATE` on the pool-week, not an application-level check.
-- [ ] Return typed, user-showable errors for: past/closed date, no capacity,
+- [x] Return typed, user-showable errors for: past/closed date, no capacity,
       inactive product, price/variant mismatch, empty cart.
 
 ## Files
@@ -122,3 +122,49 @@ can tie the webhook back. Target the sandbox account
 - Posting a tampered price is ignored; the session total matches Sanity.
 - Posting a full or closed date returns a 4xx with a usable message.
 - Two concurrent requests for the last slot: exactly one succeeds.
+
+## Outcome
+
+Shipped 2026-08-20. 61 unit tests, `tsc` and `eslint` clean.
+
+### The concurrency fix moved logic into SQL
+
+The plan called for "a unique constraint or `SELECT … FOR UPDATE`". PostgREST can
+express neither, so `db/functions.sql` now holds `place_order_hold`, which takes
+a `pg_advisory_xact_lock` per pool-week (ordered, so two multi-week carts cannot
+deadlock), re-counts capacity under that lock, and inserts — one transaction.
+
+That put the counting in SQL, so rather than keep a second copy in TypeScript,
+`lib/capacity/service.ts` was rewritten to read through the same
+`capacity_availability` function. The calendar and the reservation can no longer
+disagree about what "full" means, which was the risk flagged in Phase 1.
+
+Verified: three simultaneous requests for a one-slot pool-week, exactly one
+`clientSecret`, exactly one slot consumed.
+
+### Structure: pure core, IO shell
+
+Added for testability, and it improved the layering: `lib/capacity/rules.ts` and
+`lib/orders/{types,pricing,parse,errors}.ts` are pure; the two `service.ts`
+files are the only things that touch Postgres, Sanity or Stripe. The suite runs
+offline in under a second with no mocks.
+
+### Bug found while testing
+
+The `variations` snapshot took the size **label from the client** while pricing
+from the authoritative `_key`. A payload whose label disagreed with its key
+recorded a 6 Inch cake on an order charged $150 for an 8 Inch — and the baker
+reads that field to decide what to bake. `buildPricedLines` now snapshots the
+catalogue's label. Two regression tests cover it.
+
+### Deviations from the plan
+
+- `ui_mode: 'embedded'` does not exist in the Stripe SDK v22 — it is
+  `'embedded_page'` (`'hosted'` → `'hosted_page'`). Phase 3 needs the same care.
+- `CheckoutForm`'s cart-keyed `useEffect` was removed here rather than in Phase
+  3: against this code it would mint a pending order and burn a 45-minute hold
+  on every cart change.
+- Persisted carts are dropped (`version: 2`). A stored size label cannot be
+  turned back into a `_key`, so v1 lines would fail server-side.
+- **Currency is hardcoded `aud`** in `lib/orders/service.ts`. Assumed, never
+  confirmed.
