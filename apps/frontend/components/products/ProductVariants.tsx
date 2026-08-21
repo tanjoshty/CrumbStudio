@@ -15,7 +15,6 @@ interface Props {
 }
 
 export function ProductVariants({
-  hasCustomisation,
   id,
   name,
 }: Props) {
@@ -92,7 +91,7 @@ export function ProductVariants({
             ))}
           </div>
           <p className="text-[11px] font-light text-ink/60 mt-2">
-            6" serves 8–10 · 8" serves 14–16 · 10" serves 22–25
+            {'6" serves 8–10 · 8" serves 14–16 · 10" serves 22–25'}
           </p>
         </div>
       }

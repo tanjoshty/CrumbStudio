@@ -1,4 +1,5 @@
 import { PortableText } from "next-sanity";
+import Link from "next/link";
 import { Product } from "@/types/sanity.types";
 import { SelectedPrice } from "./SelectedPrice";
 
@@ -15,7 +16,7 @@ export function ProductContent({
     <div className="flex flex-col gap-8">
       {/* Breadcrumb */}
         <p className="text-[11px] font-medium tracking-[0.12em] uppercase text-ink/60">
-          <a href="/products" className="hover:text-cobalt transition-colors">Cakes</a>
+          <Link href="/products" className="hover:text-cobalt transition-colors">Cakes</Link>
           <span className="mx-2">›</span>
           {name}
         </p>

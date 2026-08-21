@@ -14,7 +14,6 @@ export function ProductDetails({
   description,
   hasCustomisation,
   name,
-  slug,
   id,
 }: Props) {
   return (
