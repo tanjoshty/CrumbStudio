@@ -1,6 +1,6 @@
 # Phase 3 — Stripe embedded checkout UI
 
-**Status:** Not started
+**Status:** Done (2026-08-21)
 **Depends on:** Phase 2 (needs a real client secret)
 
 ## Goal
@@ -64,16 +64,19 @@ two writers for one order.
 ## Tasks
 
 - [x] ~~Rename the publishable key env var.~~ Done 2026-08-20.
-- [ ] Read it in a module-level `loadStripe` singleton — never inside render.
-- [ ] Split `CheckoutForm` into details-collection and payment stages; remove
-      the `useEffect` session fetch.
-- [ ] Validate required fields client-side (email; delivery address when
+- [x] Read it in a module-level `loadStripe` singleton — never inside render.
+      (`lib/stripe/client.ts`; a matching server singleton in `lib/stripe/server.ts`.)
+- [x] Split `CheckoutForm` into details-collection and payment stages. The
+      session is created once, on submit — there was no `useEffect` fetch left
+      to remove.
+- [x] Validate required fields client-side (email; delivery address when
       delivering) before POSTing.
-- [ ] Mount `<EmbeddedCheckoutProvider>` / `<EmbeddedCheckout>` with the client
-      secret; keep the existing order-summary aside and brand styling.
-- [ ] Add `app/checkout/return/page.tsx` — retrieve session, render
-      success/processing/failed, clear the cart on success.
-- [ ] Surface Phase 2's typed errors inline (sold-out date, inactive product) so
+- [x] Mount `<EmbeddedCheckoutProvider>` / `<EmbeddedCheckout>` with the client
+      secret; the order-summary aside and brand styling carry across both stages.
+- [x] Add `app/checkout/return/page.tsx` — retrieve session, render
+      success/processing/failed, clear the cart on success (via
+      `ClearCartOnSuccess`).
+- [x] Surface Phase 2's typed errors inline (sold-out date, inactive product) so
       the customer can fix the cart.
 
 ## Files

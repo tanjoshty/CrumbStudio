@@ -2,47 +2,154 @@
 
 import { useState } from "react"
 import { format, parseISO } from "date-fns"
+import {
+  EmbeddedCheckout,
+  EmbeddedCheckoutProvider,
+} from "@stripe/react-stripe-js"
 
+import { getStripe } from "@/lib/stripe/client"
 import { useCartStore } from "@/store/useCartStore"
+import type { CartItem } from "@/types/cart.types"
 
-interface CheckoutFormProps {
-  /** Wire this to your submit/order-placement logic. */
-  onPlaceOrder?: () => void
+type Fulfillment = "pickup" | "delivery"
+
+/** The `{ code, message, offending }` shape `/api/checkout` returns on 4xx/5xx. */
+interface CheckoutError {
+  message: string
+  offending?: string[]
 }
-export function CheckoutForm({onPlaceOrder }: CheckoutFormProps) {
-  const {
-    cartItems,
-    total
-  } = useCartStore();
-  const [fulfillment, setFulfillment] = useState<"pickup" | "delivery">("pickup")
+
+export function CheckoutForm() {
+  const { cartItems, total } = useCartStore()
+
+  const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
+  const [fulfillment, setFulfillment] = useState<Fulfillment>("pickup")
+  const [deliveryAddress, setDeliveryAddress] = useState("")
+
+  // Empty until the customer submits their details and we create a session —
+  // opening this page must never mint a pending order or burn a capacity hold.
+  const [clientSecret, setClientSecret] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<CheckoutError | null>(null)
+
   const isEmpty = cartItems.length === 0
 
-  // NOTE: the payment fields below are still the visual placeholder, and
-  // nothing here creates a Checkout Session yet — Phase 3 replaces this with
-  // Stripe's embedded form, calling POST /api/checkout once on submit.
-  //
-  // The previous version fired that POST from an effect keyed on the cart,
-  // which was harmless against a stub but would now mint a pending order and
-  // burn a capacity hold on every cart change.
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+
+    // Validate what the DB and service would otherwise reject, so the customer
+    // gets an inline message instead of a round-trip failure.
+    if (!email.includes("@")) {
+      setError({ message: "Please enter a valid email address." })
+      return
+    }
+    if (fulfillment === "delivery" && deliveryAddress.trim() === "") {
+      setError({ message: "A delivery address is required for delivery." })
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          phone: phone.trim() || undefined,
+          fulfillmentType: fulfillment,
+          deliveryAddress:
+            fulfillment === "delivery" ? deliveryAddress.trim() : undefined,
+          // Intent only — ids, sizes, dates, notes. The server re-prices from
+          // Sanity and ignores anything money-shaped we might send.
+          items: cartItems.map((item) => ({
+            productId: item.productId,
+            sizeKey: item.sizeKey,
+            fulfillmentDate: item.deliveryDate,
+            variations: item.variations,
+            notes: item.notes || undefined,
+          })),
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        setError(
+          data?.error ?? {
+            message: "Something went wrong. Please try again.",
+          }
+        )
+        return
+      }
+      setClientSecret(data.clientSecret)
+    } catch {
+      setError({ message: "We couldn't reach the server. Please try again." })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Once a session exists, the embedded form owns payment and its own redirect
+  // to /checkout/return — so we drop the details form entirely.
+  if (clientSecret) {
+    return (
+      <div className="bg-cream text-ink min-h-screen">
+        <div className="mx-auto max-w-5xl px-6 py-12 grid gap-12 lg:grid-cols-[1fr_380px] lg:gap-16">
+          <div className="min-w-0">
+            <h2 className="font-display font-black text-[28px] text-ink uppercase leading-none mb-6">
+              <span className="text-burgundy mr-3">3</span>Payment
+            </h2>
+            <EmbeddedCheckoutProvider
+              stripe={getStripe()}
+              options={{ clientSecret }}
+            >
+              <EmbeddedCheckout />
+            </EmbeddedCheckoutProvider>
+          </div>
+          <OrderSummary cartItems={cartItems} total={total} isEmpty={isEmpty} />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="bg-cream text-ink min-h-screen">
       <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          onPlaceOrder?.()
-        }}
+        onSubmit={handleSubmit}
         className="mx-auto max-w-5xl px-6 py-12 grid gap-12 lg:grid-cols-[1fr_380px] lg:gap-16"
       >
-        {/* ── LEFT — form ─────────────────────────────────── */}
+        {/* ── LEFT — details ──────────────────────────────── */}
         <div className="flex flex-col gap-12">
-          {/* Contact */}
+          {error && (
+            <p
+              role="alert"
+              className="border border-burgundy/40 bg-burgundy/5 text-burgundy text-[13px] px-4 py-3"
+            >
+              {error.message}
+            </p>
+          )}
+
           <Section step={1} title="Contact">
-            <TextField label="Email" name="email" type="email" autoComplete="email" placeholder="you@example.com" />
-            <TextField label="Phone" name="phone" type="tel" autoComplete="tel" placeholder="0412 345 678" />
+            <TextField
+              label="Email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <TextField
+              label="Phone"
+              type="tel"
+              autoComplete="tel"
+              placeholder="0412 345 678"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
           </Section>
 
-          {/* Fulfilment */}
           <Section step={2} title="Fulfilment">
             <div className="flex gap-2.5">
               {(["pickup", "delivery"] as const).map((opt) => (
@@ -51,9 +158,11 @@ export function CheckoutForm({onPlaceOrder }: CheckoutFormProps) {
                   type="button"
                   onClick={() => setFulfillment(opt)}
                   className={`px-5 py-2.5 text-[12px] font-medium tracking-[0.1em] uppercase border transition-colors cursor-pointer
-                    ${fulfillment === opt
-                      ? "bg-ink text-cream border-ink"
-                      : "bg-paper text-ink border-cream-border hover:border-ink"}`}
+                    ${
+                      fulfillment === opt
+                        ? "bg-ink text-cream border-ink"
+                        : "bg-paper text-ink border-cream-border hover:border-ink"
+                    }`}
                 >
                   {opt}
                 </button>
@@ -63,91 +172,123 @@ export function CheckoutForm({onPlaceOrder }: CheckoutFormProps) {
             {fulfillment === "delivery" && (
               <TextArea
                 label="Delivery address"
-                name="delivery_address"
                 placeholder="Unit / street, suburb, state, postcode"
+                value={deliveryAddress}
+                onChange={(e) => setDeliveryAddress(e.target.value)}
               />
             )}
           </Section>
 
-          {/* Payment — VISUAL PLACEHOLDER, replace with Stripe Elements */}
-          <Section step={3} title="Payment">
-            <p className="text-[12px] text-ink/60 -mt-2">
-              Demo only — no payment is processed. Replace with Stripe.
-            </p>
-            <TextField label="Card number" name="card_number" inputMode="numeric" placeholder="1234 1234 1234 1234" />
-            <div className="grid grid-cols-2 gap-4">
-              <TextField label="Expiry" name="card_expiry" placeholder="MM / YY" />
-              <TextField label="CVC" name="card_cvc" inputMode="numeric" placeholder="123" />
-            </div>
-            <TextField label="Name on card" name="card_name" autoComplete="cc-name" placeholder="Jane Baker" />
-          </Section>
+          <p className="text-[12px] text-ink/60 -mt-4">
+            Card details are collected securely by Stripe on the next step.
+          </p>
         </div>
 
         {/* ── RIGHT — order summary ───────────────────────── */}
-        <aside className="lg:sticky lg:top-6 self-start border border-cream-border bg-paper">
-          <div className="px-6 py-5 bg-ink">
-            <h2 className="font-display font-black text-2xl text-cream uppercase tracking-[0.02em]">
-              Order Summary
-            </h2>
-          </div>
-
-          {isEmpty ? (
-            <p className="px-6 py-10 text-center text-[12px] font-medium tracking-[0.15em] uppercase text-ink/50">
-              Your cart is empty
-            </p>
-          ) : (
-            <ul className="divide-y divide-cream-border">
-              {cartItems.map((item) => (
-                <li key={item.lineId} className="flex gap-4 px-6 py-5">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-display font-black text-[18px] text-ink uppercase leading-none mb-1.5">
-                      {item.name}
-                    </p>
-                    <p className="text-[13px] text-ink/75">
-                      {[item.variations.size, item.variations.flavour, item.variations.colour]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                    {item.deliveryDate && (
-                      <p className="text-[13px] text-ink/75">
-                        {format(parseISO(item.deliveryDate), "EEE d MMM yyyy")}
-                      </p>
-                    )}
-                    {item.notes && (
-                      <p className="text-[13px] italic text-ink/55 mt-0.5">“{item.notes}”</p>
-                    )}
-                  </div>
-                  <span className="font-display font-extrabold text-lg text-burgundy shrink-0">
-                    ${item.price}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="px-6 py-5 border-t border-cream-border flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium tracking-[0.16em] uppercase text-ink/70">Total</span>
-              <span className="font-display font-black text-[30px] text-burgundy leading-none">${total}</span>
-            </div>
-            <button
-              type="submit"
-              disabled={isEmpty}
-              className="w-full bg-cobalt text-cream text-[13px] font-medium tracking-[0.12em] uppercase py-[18px] cursor-pointer hover:bg-cobalt-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Place Order
-            </button>
-            <p className="text-[12px] text-ink/60 tracking-[0.02em] text-center">
-              Full payment required at checkout. Cancellations accepted up to 72 hours before your date.
-            </p>
-          </div>
-        </aside>
+        <OrderSummary
+          cartItems={cartItems}
+          total={total}
+          isEmpty={isEmpty}
+          footer={
+            <>
+              <button
+                type="submit"
+                disabled={isEmpty || submitting}
+                className="w-full bg-cobalt text-cream text-[13px] font-medium tracking-[0.12em] uppercase py-[18px] cursor-pointer hover:bg-cobalt-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {submitting ? "Starting…" : "Continue to Payment"}
+              </button>
+              <p className="text-[12px] text-ink/60 tracking-[0.02em] text-center">
+                Full payment required at checkout. Cancellations accepted up to
+                72 hours before your date.
+              </p>
+            </>
+          }
+        />
       </form>
     </div>
   )
 }
 
-function Section({ step, title, children }: { step: number; title: string; children: React.ReactNode }) {
+function OrderSummary({
+  cartItems,
+  total,
+  isEmpty,
+  footer,
+}: {
+  cartItems: CartItem[]
+  total: number
+  isEmpty: boolean
+  footer?: React.ReactNode
+}) {
+  return (
+    <aside className="lg:sticky lg:top-6 self-start border border-cream-border bg-paper h-fit">
+      <div className="px-6 py-5 bg-ink">
+        <h2 className="font-display font-black text-2xl text-cream uppercase tracking-[0.02em]">
+          Order Summary
+        </h2>
+      </div>
+
+      {isEmpty ? (
+        <p className="px-6 py-10 text-center text-[12px] font-medium tracking-[0.15em] uppercase text-ink/50">
+          Your cart is empty
+        </p>
+      ) : (
+        <ul className="divide-y divide-cream-border">
+          {cartItems.map((item) => (
+            <li key={item.lineId} className="flex gap-4 px-6 py-5">
+              <div className="flex-1 min-w-0">
+                <p className="font-display font-black text-[18px] text-ink uppercase leading-none mb-1.5">
+                  {item.name}
+                </p>
+                <p className="text-[13px] text-ink/75">
+                  {[item.variations.size, item.variations.flavour, item.variations.colour]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                {item.deliveryDate && (
+                  <p className="text-[13px] text-ink/75">
+                    {format(parseISO(item.deliveryDate), "EEE d MMM yyyy")}
+                  </p>
+                )}
+                {item.notes && (
+                  <p className="text-[13px] italic text-ink/55 mt-0.5">
+                    “{item.notes}”
+                  </p>
+                )}
+              </div>
+              <span className="font-display font-extrabold text-lg text-burgundy shrink-0">
+                ${item.price}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="px-6 py-5 border-t border-cream-border flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-medium tracking-[0.16em] uppercase text-ink/70">
+            Total
+          </span>
+          <span className="font-display font-black text-[30px] text-burgundy leading-none">
+            ${total}
+          </span>
+        </div>
+        {footer}
+      </div>
+    </aside>
+  )
+}
+
+function Section({
+  step,
+  title,
+  children,
+}: {
+  step: number
+  title: string
+  children: React.ReactNode
+}) {
   return (
     <section className="flex flex-col gap-5">
       <h2 className="font-display font-black text-[28px] text-ink uppercase leading-none">
@@ -159,10 +300,15 @@ function Section({ step, title, children }: { step: number; title: string; child
   )
 }
 
-function TextField({ label, ...props }: { label: string } & React.ComponentProps<"input">) {
+function TextField({
+  label,
+  ...props
+}: { label: string } & React.ComponentProps<"input">) {
   return (
     <label className="flex flex-col gap-2">
-      <span className="text-[11px] font-medium tracking-[0.16em] uppercase text-ink/70">{label}</span>
+      <span className="text-[11px] font-medium tracking-[0.16em] uppercase text-ink/70">
+        {label}
+      </span>
       <input
         {...props}
         className="w-full border border-cream-border bg-paper text-ink text-[14px] px-4 py-3 placeholder:text-ink/40 focus:outline-none focus:border-burgundy transition-colors"
@@ -171,10 +317,15 @@ function TextField({ label, ...props }: { label: string } & React.ComponentProps
   )
 }
 
-function TextArea({ label, ...props }: { label: string } & React.ComponentProps<"textarea">) {
+function TextArea({
+  label,
+  ...props
+}: { label: string } & React.ComponentProps<"textarea">) {
   return (
     <label className="flex flex-col gap-2">
-      <span className="text-[11px] font-medium tracking-[0.16em] uppercase text-ink/70">{label}</span>
+      <span className="text-[11px] font-medium tracking-[0.16em] uppercase text-ink/70">
+        {label}
+      </span>
       <textarea
         rows={3}
         {...props}
