@@ -1,7 +1,7 @@
-import Stripe from "stripe"
 import { addMinutes } from "date-fns"
 
 import { checkCapacity } from "@/lib/capacity/service"
+import { getStripeServer } from "@/lib/stripe/server"
 import { client as sanityClient } from "@/lib/sanity/client"
 import { PRODUCT_PRICING_QUERY } from "@/lib/sanity/queries"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -228,7 +228,7 @@ async function createCheckoutSession(args: {
   origin: string
   expiresAt: Date
 }): Promise<string | null> {
-  const stripe = new Stripe(process.env.NEXT_STRIPE_SECRET_KEY as string)
+  const stripe = getStripeServer()
 
   const session = await stripe.checkout.sessions.create({
     // `embedded_page`, not `embedded` — the Stripe SDK v22 renamed the ui_mode
