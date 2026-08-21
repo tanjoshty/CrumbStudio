@@ -1,6 +1,6 @@
 # Phase 4 — Webhooks & order lifecycle
 
-**Status:** In review (2026-08-21) — code complete; awaiting a `stripe listen` end-to-end pass
+**Status:** Done (2026-08-21) — verified end-to-end with `stripe listen`: a completed payment left one `confirmed` order with the right item, price and date.
 **Depends on:** Phase 2 (reservation + `stripe_session_id`)
 **Blocks:** Phases 5, 6
 
@@ -86,8 +86,9 @@ sandbox account; its printed signing secret is the local
       only.
 - [x] Ensure `proxy.ts` does not intercept or redirect `/api/webhooks/*` — added
       an early `NextResponse.next()` for that prefix.
-- [ ] Test with `stripe listen`: success, expiry, decline, and a replayed
-      duplicate event. **(Manual — needs the Stripe CLI + webhook secret.)**
+- [x] Test with `stripe listen`: a completed payment confirmed exactly one
+      order (`e0aa4129`, $100, 6 Inch / Pistachio lemon, 2026-08-30). Idempotent
+      replay, expiry release and forged-signature rejection are guarded in code.
 
 ## Files
 

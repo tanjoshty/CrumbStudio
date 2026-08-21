@@ -15,7 +15,7 @@ entry.
 | [1](./phase-1-capacity-availability.md) | Capacity & availability | **Done** 2026-08-20 | 2 |
 | [2](./phase-2-checkout-session.md) | Checkout API & slot reservation | **Done** 2026-08-20 | 3, 4 |
 | [3](./phase-3-embedded-checkout.md) | Stripe embedded checkout UI | **Done** 2026-08-21 | 4 |
-| [4](./phase-4-webhooks-orders.md) | Webhooks & order lifecycle | In review 2026-08-21 | 5, 6 |
+| [4](./phase-4-webhooks-orders.md) | Webhooks & order lifecycle | **Done** 2026-08-21 | 5, 6 |
 | [5](./phase-5-confirmation-email.md) | Confirmation email | Not started | — |
 | [6](./phase-6-admin.md) | Admin order management | Not started | — |
 | [7](./phase-7-deploy.md) | Deploy to AWS via SST | Not started | — |
