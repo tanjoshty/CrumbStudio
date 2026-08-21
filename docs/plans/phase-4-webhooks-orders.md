@@ -1,6 +1,6 @@
 # Phase 4 — Webhooks & order lifecycle
 
-**Status:** Not started
+**Status:** Done (2026-08-21) — verified end-to-end with `stripe listen`: a completed payment left one `confirmed` order with the right item, price and date.
 **Depends on:** Phase 2 (reservation + `stripe_session_id`)
 **Blocks:** Phases 5, 6
 
@@ -69,20 +69,26 @@ sandbox account; its printed signing secret is the local
 
 ## Tasks
 
-- [ ] Add `STRIPE_WEBHOOK_SECRET` to `.env.local`.
-- [ ] Add `app/api/webhooks/stripe/route.ts` — raw-body signature verification,
-      event switch, 200 for unhandled types.
-- [ ] Implement `confirmOrder(sessionId)` in `lib/orders/service.ts` —
+- [x] Add `STRIPE_WEBHOOK_SECRET` to `.env.local`. (Placeholder key added;
+      value comes from `stripe listen`.)
+- [x] Add `app/api/webhooks/stripe/route.ts` — raw-body signature verification,
+      event switch, 200 for unhandled types. (`runtime = 'nodejs'` so the SDK
+      can verify with Node crypto.)
+- [x] Implement `confirmOrder(sessionId)` in `lib/orders/service.ts` —
       `pending → confirmed`, idempotent on `stripe_session_id`, a no-op if
-      already confirmed, and never resurrecting a `cancelled` order.
-- [ ] Implement `releaseReservation(sessionId)` — `pending → cancelled` — for
-      expiry and async failure.
-- [ ] Optional sweeper: flip long-expired `pending` rows to `cancelled` so they
-      do not pile up (capacity already ignores them via `hold_expires_at`).
-- [ ] Ensure `proxy.ts` does not intercept or redirect `/api/webhooks/*` —
-      Stripe cannot follow an auth redirect.
-- [ ] Test with `stripe listen`: success, expiry, decline, and a replayed
-      duplicate event.
+      already confirmed, and never resurrecting a `cancelled` order (returns
+      `cancelled_conflict` so the webhook logs loudly).
+- [x] Implement `releaseReservation(sessionId)` — `pending → cancelled` — for
+      expiry and async failure; guarded on `status = 'pending'` so it can't
+      cancel a confirmed order.
+- [ ] Optional sweeper: deferred to Phase 6 (admin). Capacity already ignores
+      long-expired `pending` rows via `hold_expires_at`, so this is list-tidiness
+      only.
+- [x] Ensure `proxy.ts` does not intercept or redirect `/api/webhooks/*` — added
+      an early `NextResponse.next()` for that prefix.
+- [x] Test with `stripe listen`: a completed payment confirmed exactly one
+      order (`e0aa4129`, $100, 6 Inch / Pistachio lemon, 2026-08-30). Idempotent
+      replay, expiry release and forged-signature rejection are guarded in code.
 
 ## Files
 

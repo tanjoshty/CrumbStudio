@@ -3,6 +3,12 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
 export default async function middleware(request: NextRequest) {
+  // Webhooks carry a Stripe signature, not an auth cookie: skip session
+  // handling entirely so Stripe never meets a redirect or a touched request.
+  if (request.nextUrl.pathname.startsWith('/api/webhooks')) {
+    return NextResponse.next()
+  }
+
   const { response, user } = await updateSession(request)
 
   if (!user && request.nextUrl.pathname.startsWith('/admin')) {

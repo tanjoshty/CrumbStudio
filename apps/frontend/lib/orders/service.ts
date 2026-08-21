@@ -278,3 +278,112 @@ async function createCheckoutSession(args: {
 
   return session.client_secret
 }
+
+/**
+ * What confirming a paid checkout did. The webhook logs on the two abnormal
+ * outcomes; everything else is a quiet success or a harmless replay.
+ */
+export type ConfirmOutcome =
+  /** `pending → confirmed`, this call. */
+  | "confirmed"
+  /** Already `confirmed` or further along — a Stripe retry. No change. */
+  | "noop"
+  /** No order carries this session id. Phase 2 made a session without a hold. */
+  | "not_found"
+  /** Order was `cancelled` before payment landed — paid, but the slot is gone. */
+  | "cancelled_conflict"
+
+/**
+ * Turn a paid reservation into a confirmed order.
+ *
+ * The only writer of `confirmed`. The row and its items already exist from
+ * checkout (Phase 2), snapshotted with the right prices and dates — so this is
+ * a status flip, never an insert, and it must not rewrite anything from the
+ * Stripe payload.
+ *
+ * Idempotent and order-independent: Stripe retries and can deliver out of
+ * order, so the decision branches on the row's *current* status, and the write
+ * is guarded `status = 'pending'` so a late event can never move a confirmed or
+ * cancelled order.
+ */
+export async function confirmOrder(sessionId: string): Promise<ConfirmOutcome> {
+  const db = createAdminClient()
+
+  const { data: order, error } = await db
+    .from("order")
+    .select("id, status")
+    .eq("stripe_session_id", sessionId)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(`Failed to look up order for ${sessionId}: ${error.message}`)
+  }
+  if (!order) return "not_found"
+  if (order.status === "cancelled") return "cancelled_conflict"
+  if (order.status !== "pending") return "noop" // already confirmed or beyond
+
+  // Guarded on `pending`: if a concurrent event flipped the row between the read
+  // and here, `select()` comes back empty and we treat it as an already-handled
+  // no-op rather than a second confirmation.
+  const { data: updated, error: updateError } = await db
+    .from("order")
+    .update({ status: "confirmed" })
+    .eq("id", order.id)
+    .eq("status", "pending")
+    .select("id")
+
+  if (updateError) {
+    throw new Error(`Failed to confirm order ${order.id}: ${updateError.message}`)
+  }
+  return updated && updated.length > 0 ? "confirmed" : "noop"
+}
+
+/** What releasing a reservation did. */
+export type ReleaseOutcome =
+  /** `pending → cancelled`, this call. The slot is freed. */
+  | "released"
+  /** Already `cancelled` — a duplicate expiry/failure event. */
+  | "noop"
+  /** No order carries this session id. */
+  | "not_found"
+  /** Order was already `confirmed` (or beyond); a late expiry must not cancel it. */
+  | "refused_confirmed"
+
+/**
+ * Release a slot when payment never completes — `checkout.session.expired` or
+ * `async_payment_failed`.
+ *
+ * The write is guarded `status = 'pending'`, which is the guarantee that a late
+ * `expired` event (they fire ~24h out and can race a `completed`) can never
+ * cancel an order that was already confirmed.
+ */
+export async function releaseReservation(
+  sessionId: string
+): Promise<ReleaseOutcome> {
+  const db = createAdminClient()
+
+  const { data: order, error } = await db
+    .from("order")
+    .select("id, status")
+    .eq("stripe_session_id", sessionId)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(`Failed to look up order for ${sessionId}: ${error.message}`)
+  }
+  if (!order) return "not_found"
+  if (order.status === "cancelled") return "noop"
+  if (order.status !== "pending") return "refused_confirmed"
+
+  const { data: updated, error: updateError } = await db
+    .from("order")
+    .update({ status: "cancelled" })
+    .eq("id", order.id)
+    .eq("status", "pending")
+    .select("id")
+
+  if (updateError) {
+    throw new Error(`Failed to release order ${order.id}: ${updateError.message}`)
+  }
+  return updated && updated.length > 0 ? "released" : "refused_confirmed"
+}
