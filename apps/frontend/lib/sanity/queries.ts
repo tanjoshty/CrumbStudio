@@ -22,3 +22,12 @@ export const PRODUCT_PRICING_QUERY = defineQuery(
     "sizes": sizes[]{ _key, label, price }
   }`
 )
+
+/**
+ * Product names by id, for rendering a confirmation email. `order_item` snapshots
+ * the variations but not the cake's name, so it is looked back up here at send
+ * time — Sanity stays the source of truth for catalogue content.
+ */
+export const PRODUCT_NAMES_QUERY = defineQuery(
+  `*[_type == "product" && _id in $ids]{ _id, name }`
+)

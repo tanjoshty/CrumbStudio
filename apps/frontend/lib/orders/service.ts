@@ -5,6 +5,7 @@ import { getStripeServer } from "@/lib/stripe/server"
 import { client as sanityClient } from "@/lib/sanity/client"
 import { PRODUCT_PRICING_QUERY } from "@/lib/sanity/queries"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { sendOrderConfirmation } from "./confirmation"
 import { capacityMessage, holdErrorToMessage } from "./errors"
 import { buildPricedLines, totalCents } from "./pricing"
 import type {
@@ -335,7 +336,20 @@ export async function confirmOrder(sessionId: string): Promise<ConfirmOutcome> {
   if (updateError) {
     throw new Error(`Failed to confirm order ${order.id}: ${updateError.message}`)
   }
-  return updated && updated.length > 0 ? "confirmed" : "noop"
+  const confirmed = updated !== null && updated.length > 0
+  if (confirmed) {
+    // After the commit, never before — a receipt for an order that never pays
+    // is worse than a late one. A send failure must not fail the webhook:
+    // Stripe would retry, and a retry that re-sends email is worse than a
+    // missed one. So swallow it here; the null `confirmation_sent_at` leaves an
+    // admin resend as the recovery path.
+    try {
+      await sendOrderConfirmation(order.id)
+    } catch (err) {
+      console.error("[orders] confirmation email failed", order.id, err)
+    }
+  }
+  return confirmed ? "confirmed" : "noop"
 }
 
 /** What releasing a reservation did. */

@@ -25,6 +25,7 @@ CREATE TABLE "order" (
   delivery_address text,  -- snapshot at checkout; null for pickup
   stripe_session_id text UNIQUE,  -- the Stripe Checkout Session this order came from; the webhook's idempotency key
   hold_expires_at  timestamptz,   -- while status = 'pending' this row IS the capacity hold; past this instant it stops consuming a slot, even if Stripe's `expired` event never arrived
+  confirmation_sent_at timestamptz,  -- set once the confirmation email has gone out; makes the send idempotent across webhook replays and doubles as an admin resend affordance
   CHECK (fulfillment_type <> 'delivery' OR delivery_address IS NOT NULL)  -- delivery orders must have an address
 );
 
