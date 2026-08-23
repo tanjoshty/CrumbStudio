@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { sendOrderConfirmation } from "./confirmation"
 import { capacityMessage, holdErrorToMessage } from "./errors"
 import { buildPricedLines, totalCents } from "./pricing"
+import { canTransition, type OrderStatus } from "./status"
 import type {
   OrderErrorCode,
   PlaceOrderInput,
@@ -400,4 +401,58 @@ export async function releaseReservation(
     throw new Error(`Failed to release order ${order.id}: ${updateError.message}`)
   }
   return updated && updated.length > 0 ? "released" : "refused_confirmed"
+}
+
+export type TransitionResult =
+  | { ok: true; status: OrderStatus }
+  | { ok: false; error: string }
+
+/**
+ * Move an order to a new status, admin side.
+ *
+ * Validates the move against the state machine rather than trusting whatever the
+ * form posts, and guards the write on the *current* status so two admins acting
+ * at once can't double-apply. Cancelling needs no separate capacity step — the
+ * `capacity_booking` view already ignores `cancelled` orders, so the slot frees
+ * itself.
+ */
+export async function updateOrderStatus(
+  orderId: string,
+  next: OrderStatus
+): Promise<TransitionResult> {
+  const db = createAdminClient()
+
+  const { data: order, error } = await db
+    .from("order")
+    .select("id, status")
+    .eq("id", orderId)
+    .maybeSingle()
+
+  if (error) {
+    return { ok: false, error: `Failed to load order: ${error.message}` }
+  }
+  if (!order) {
+    return { ok: false, error: "Order not found." }
+  }
+
+  const from = order.status as OrderStatus
+  if (!canTransition(from, next)) {
+    return { ok: false, error: `Can't move an order from ${from} to ${next}.` }
+  }
+
+  const { data: updated, error: updateError } = await db
+    .from("order")
+    .update({ status: next })
+    .eq("id", orderId)
+    .eq("status", from)
+    .select("id")
+
+  if (updateError) {
+    return { ok: false, error: updateError.message }
+  }
+  if (!updated || updated.length === 0) {
+    // Someone else changed the status between the read and the write.
+    return { ok: false, error: "Order changed in the meantime — refresh." }
+  }
+  return { ok: true, status: next }
 }

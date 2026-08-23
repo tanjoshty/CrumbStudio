@@ -1,6 +1,6 @@
 # Phase 6a — Admin order management
 
-**Status:** Not started
+**Status:** In review (2026-08-23) — code complete; awaiting an authed browser pass
 **Depends on:** Phase 4 (needs real orders to manage)
 **Blocks:** Phase 6b (shares the admin shell + auth gate)
 
@@ -81,15 +81,26 @@ the state machine just has to allow it and nothing else.
 
 ## Tasks
 
-- [ ] Add the `ADMIN_USER_IDS` check in `proxy.ts`; stop treating any
-      authenticated user as an admin. Add the var to `.env.local` and (Phase 7)
-      to the deployed stage. Keep the page-level fallback.
-- [ ] Admin shell/nav (Queue / Orders) — the layout Phase 6b will hang off.
-- [ ] Queue view grouped by `order_item.fulfillment_date`.
-- [ ] Order list with status filter + order detail page.
-- [ ] Status-transition server action with a validated state machine.
-- [ ] Cancel path that releases capacity (status → `cancelled`).
-- [ ] Empty and loading states — the queue is usually short, not empty-by-bug.
+- [x] Add the `ADMIN_USER_IDS` check in `proxy.ts` (`lib/auth/admin.ts`); stop
+      treating any authenticated user as an admin. Var added to `.env.local`;
+      Phase 7 adds it to the deployed stage. Page-level fallback in the admin
+      layout.
+- [x] Admin shell/nav (Queue / Orders) — `app/admin/layout.tsx` + `AdminNav`.
+- [x] Queue view grouped by `order_item.fulfillment_date` (`app/admin/page.tsx`).
+- [x] Order list with status filter + order detail page (`app/admin/orders/*`).
+- [x] Status-transition server action with a validated state machine
+      (`lib/orders/status.ts`, `updateOrderStatus`, `app/admin/actions.ts`).
+- [x] Cancel path that releases capacity (status → `cancelled`; the
+      `capacity_booking` view frees the slot on its own).
+- [x] Empty and loading states (`app/admin/loading.tsx` + per-view empty copy).
+
+### Verified
+- Unauthenticated `/admin`, `/admin/orders`, `/admin/orders/[id]` all 307 →
+  `/auth/login`.
+- `pnpm build` / `pnpm lint` clean; 83 unit tests (13 new: allow-list + state
+  machine).
+- Authed admin views / transitions: pending a browser pass after a dev restart
+  (needs `ADMIN_USER_IDS` + the proxy change loaded).
 
 ## Files
 

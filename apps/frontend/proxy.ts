@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
+import { isAdmin } from '@/lib/auth/admin'
 import { updateSession } from '@/lib/supabase/middleware'
 
 export default async function middleware(request: NextRequest) {
@@ -11,10 +12,21 @@ export default async function middleware(request: NextRequest) {
 
   const { response, user } = await updateSession(request)
 
-  if (!user && request.nextUrl.pathname.startsWith('/admin')) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/auth/login'
-    return NextResponse.redirect(url)
+  if (request.nextUrl.pathname.startsWith('/admin')) {
+    // `user` is the decoded JWT claims (or undefined). Not signed in → login;
+    // signed in but not on the admin allow-list → home. Every customer can
+    // register, so authentication alone must not grant admin access.
+    const sub = (user as { sub?: string } | undefined)?.sub
+    if (!user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/login'
+      return NextResponse.redirect(url)
+    }
+    if (!isAdmin(sub)) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      return NextResponse.redirect(url)
+    }
   }
 
   return response
