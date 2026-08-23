@@ -66,8 +66,8 @@ export function StatusActions({
             onClick={() => {
               if (
                 confirm(
-                  "Cancel this order? This frees the capacity slot for rebooking. " +
-                    "It does NOT refund the customer yet — issue any refund in the Stripe dashboard."
+                  "Cancel this order? This issues a full refund to the customer " +
+                    "and frees the capacity slot for rebooking."
                 )
               ) {
                 move("cancelled")

@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { sendOrderConfirmation } from "./confirmation"
 import { capacityMessage, holdErrorToMessage } from "./errors"
 import { buildPricedLines, totalCents } from "./pricing"
+import { refundOrder } from "./refund"
 import { canTransition, type OrderStatus } from "./status"
 import type {
   OrderErrorCode,
@@ -438,6 +439,17 @@ export async function updateOrderStatus(
   const from = order.status as OrderStatus
   if (!canTransition(from, next)) {
     return { ok: false, error: `Can't move an order from ${from} to ${next}.` }
+  }
+
+  // Refund before cancelling. Every admin-cancellable status is a paid order, so
+  // a cancel that leaves the customer charged is a bug. If the refund fails we
+  // stop here rather than flip to `cancelled` — never a silent "cancelled but
+  // not refunded". The refund is idempotent, so this is safe to retry.
+  if (next === "cancelled") {
+    const refund = await refundOrder(orderId)
+    if (!refund.ok) {
+      return { ok: false, error: `Couldn't refund: ${refund.error}` }
+    }
   }
 
   const { data: updated, error: updateError } = await db

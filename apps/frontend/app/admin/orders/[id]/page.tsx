@@ -107,6 +107,13 @@ export default async function AdminOrderDetailPage({
         <Field label="Placed">
           <p>{format(parseISO(order.createdAt), "d MMM yyyy, h:mmaaa")}</p>
         </Field>
+        {order.refundedAt && (
+          <Field label="Refund">
+            <p className="text-burgundy">
+              Fully refunded {format(parseISO(order.refundedAt), "d MMM yyyy")}
+            </p>
+          </Field>
+        )}
       </section>
     </div>
   )

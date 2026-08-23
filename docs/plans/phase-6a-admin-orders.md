@@ -109,23 +109,32 @@ the state machine just has to allow it and nothing else.
 - `proxy.ts` (role check)
 - `lib/orders/service.ts` (extend: validated transition + cancel)
 
-## Follow-up (separate PR): refund on cancel
+## Follow-up (separate PR): refund on cancel — **Done (2026-08-23)**
 
-**Decided 2026-08-23.** 6a's cancel frees capacity but does **not** touch Stripe —
-a paid order stays charged, and the cancel dialog says so explicitly. A focused
-follow-up PR adds the refund, kept out of 6a so the money path gets isolated
-review:
+Shipped in its own branch/PR (`feat/refund-on-cancel`), kept out of 6a so the
+money path got isolated review.
 
-- **Always a full refund** on cancelling a paid order (`confirmed` / `in_progress`
-  / `ready`). No partial/late-cancellation logic yet.
-- The `payment_intent` id isn't persisted — retrieve it from the order's
-  `stripe_session_id` at cancel time (`session.payment_intent`), then create the
-  refund.
-- **Idempotent**: a refund idempotency key (e.g. `refund-<orderId>`) so a
-  double-click or retry never double-refunds. Record `refunded_at` /
-  `stripe_refund_id` on `"order"` (new columns → manual `ALTER`).
-- **Refund before cancel**: if the refund fails, do not flip to `cancelled` —
-  surface the error so there's never a silent "cancelled but not refunded".
+- **Always a full refund** on cancelling a paid order (`refundOrder` in
+  `lib/orders/refund.ts`; no `amount` = full). No partial/late logic yet.
+- The `payment_intent` id isn't persisted — retrieved from the order's
+  `stripe_session_id` at cancel time (`session.payment_intent`).
+- **Idempotent** two ways: a `refunded_at` short-circuit, and a
+  `refund-<orderId>` Stripe idempotency key so a racing retry can't double-refund.
+  Records `refunded_at` / `stripe_refund_id` on `"order"`.
+- **Refund before cancel** (`updateOrderStatus`): if the refund fails, the status
+  does not flip — never a silent "cancelled but not refunded". The cancel dialog
+  and the detail page now reflect the refund.
+
+### Manual step — run before testing this branch
+
+```sql
+ALTER TABLE "order"
+  ADD COLUMN IF NOT EXISTS refunded_at timestamptz,
+  ADD COLUMN IF NOT EXISTS stripe_refund_id text;
+```
+
+The detail read selects `refunded_at`, so without these columns `/admin/orders/[id]`
+errors.
 
 ## Done when
 
