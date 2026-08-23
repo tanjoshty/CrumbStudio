@@ -1,6 +1,6 @@
 # Phase 6b — Admin capacity editor
 
-**Status:** Not started
+**Status:** In review (2026-08-23) — code complete; awaiting an authed browser pass
 **Depends on:** Phase 1 (the capacity model) and Phase 6a (the admin shell + auth gate)
 
 ## Goal
@@ -61,13 +61,21 @@ optimistic UI is needed — revalidate the path after a write.
 
 ## Tasks
 
-- [ ] Capacity section in the admin nav (added in 6a).
-- [ ] Edit `capacity_pool` counts.
-- [ ] Add / edit / remove `capacity_override` rows for a pool-week.
-- [ ] Toggle `date_closure` dates (add with an optional note, remove).
-- [ ] A read-back that shows the resulting availability for an upcoming week so
-      the baker can see the effect of a change.
-- [ ] Server actions with validation; revalidate after writes.
+- [x] Capacity section in the admin nav.
+- [x] Edit `capacity_pool` counts (`PoolMaxForm`).
+- [x] Add / edit (upsert) / remove `capacity_override` rows for a pool-week;
+      the chosen day snaps to its Monday (`weekStartOf`).
+- [x] Add (with optional note) / reopen `date_closure` dates.
+- [x] "Week at a glance" read-back — slots left per day for a chosen week
+      (prev/next nav), via the same `capacity_availability` the storefront reads.
+- [x] Server actions re-check admin, validate (`parseMaxItems`, `isDateKey`),
+      and revalidate after writes. 7 unit tests over the week/weekday helpers.
+
+### Verified
+- Unauthenticated `/admin/capacity` 307 → `/auth/login`.
+- `pnpm build` / `pnpm lint` clean; 90 unit tests (7 new).
+- Authed edits (pool counts, overrides, closures) + the week preview: pending a
+  browser pass (no restart needed — no new env or proxy change).
 
 ## Files
 
