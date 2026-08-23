@@ -1,8 +1,7 @@
 import { sendConfirmationEmails } from "@/lib/email/send"
 import type { OrderEmailData, OrderEmailItem } from "@/lib/email/types"
-import { client as sanityClient } from "@/lib/sanity/client"
-import { PRODUCT_NAMES_QUERY } from "@/lib/sanity/queries"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { productNamesByIds } from "./product-names"
 
 /**
  * Gather a confirmed order's detail and send the two confirmation emails, then
@@ -54,14 +53,7 @@ export async function sendOrderConfirmation(
   }
   const rows = items ?? []
 
-  const ids = [...new Set(rows.map((r) => r.sanity_product_id))]
-  const products = ids.length
-    ? await sanityClient.fetch<{ _id: string; name: string | null }[]>(
-        PRODUCT_NAMES_QUERY,
-        { ids }
-      )
-    : []
-  const nameById = new Map(products.map((p) => [p._id, p.name ?? "Cake"]))
+  const nameById = await productNamesByIds(rows.map((r) => r.sanity_product_id))
 
   const emailItems: OrderEmailItem[] = rows.map((row) => {
     const v = (row.variations ?? {}) as Record<string, string | undefined>

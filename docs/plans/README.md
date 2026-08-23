@@ -16,11 +16,13 @@ entry.
 | [2](./phase-2-checkout-session.md) | Checkout API & slot reservation | **Done** 2026-08-20 | 3, 4 |
 | [3](./phase-3-embedded-checkout.md) | Stripe embedded checkout UI | **Done** 2026-08-21 | 4 |
 | [4](./phase-4-webhooks-orders.md) | Webhooks & order lifecycle | **Done** 2026-08-21 | 5, 6 |
-| [5](./phase-5-confirmation-email.md) | Confirmation email | In review 2026-08-21 | — |
-| [6](./phase-6-admin.md) | Admin order management | Not started | — |
+| [5](./phase-5-confirmation-email.md) | Confirmation email | **Done** 2026-08-22 | — |
+| [6a](./phase-6a-admin-orders.md) | Admin order management | Not started | 6b |
+| [6b](./phase-6b-admin-capacity.md) | Admin capacity editor | Not started | — |
 | [7](./phase-7-deploy.md) | Deploy to AWS via SST | Not started | — |
 
-Phases 1–4 are the critical path to a working order. 5–7 can follow in any order.
+Phases 1–4 are the critical path to a working order. 5, 6a/6b and 7 can follow in
+any order (6b builds on 6a's admin shell).
 
 ## Where things actually stand
 
@@ -82,7 +84,7 @@ Decisions that span phases. Settle them once here; phase docs reference them.
 | `sun` | Sun | 2 |
 
 Eight cakes a week, with Mon–Thu sharing a single slot between them. These live
-in `db/seed.sql` and become editable by the baker in the admin panel (Phase 6);
+in `db/seed.sql` and become editable by the baker in the admin panel (Phase 6b);
 until then they change in the seed file and get re-run.
 
 ### C1 — Capacity is weekly pools, not cakes per day

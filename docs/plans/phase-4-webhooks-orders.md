@@ -81,7 +81,7 @@ sandbox account; its printed signing secret is the local
 - [x] Implement `releaseReservation(sessionId)` — `pending → cancelled` — for
       expiry and async failure; guarded on `status = 'pending'` so it can't
       cancel a confirmed order.
-- [ ] Optional sweeper: deferred to Phase 6 (admin). Capacity already ignores
+- [ ] Optional sweeper: deferred to Phase 6a (admin). Capacity already ignores
       long-expired `pending` rows via `hold_expires_at`, so this is list-tidiness
       only.
 - [x] Ensure `proxy.ts` does not intercept or redirect `/api/webhooks/*` — added

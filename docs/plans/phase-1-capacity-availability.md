@@ -22,7 +22,7 @@ closures or how full a week already is.
 **In:** a capacity service module, an availability endpoint, and wiring the PDP
 date picker to it.
 
-**Out:** admin UI for editing capacity (Phase 6), and the reservation write
+**Out:** admin UI for editing capacity (Phase 6b), and the reservation write
 itself (Phase 2) — this phase only *reads* availability.
 
 ## Design notes

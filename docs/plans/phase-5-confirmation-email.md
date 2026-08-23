@@ -16,7 +16,7 @@ nobody sees is an order nobody bakes.
 **In:** transactional send on confirmation, customer receipt, baker notification.
 
 **Out:** marketing email, status-change emails ("your cake is ready") — those
-belong with the admin status transitions in Phase 6.
+belong with the admin status transitions in Phase 6a.
 
 ## Design notes
 
