@@ -10,9 +10,9 @@ import {
   getPools,
   getWeekPreview,
 } from "@/lib/capacity/admin"
-import { formatWeekdays, weekStartOf } from "@/lib/capacity/week"
+import { formatWeekdays, groupClosures, weekStartOf } from "@/lib/capacity/week"
 import {
-  removeClosureAction,
+  removeClosuresAction,
   removeOverrideAction,
 } from "./actions"
 
@@ -188,20 +188,29 @@ export default async function AdminCapacityPage({
 
         {closures.length > 0 && (
           <ul className="mt-3 border border-cream-border bg-paper divide-y divide-cream-border">
-            {closures.map((c) => (
+            {groupClosures(closures).map((range) => (
               <li
-                key={c.date}
+                key={range.start}
                 className="flex items-center justify-between gap-4 px-5 py-3.5"
               >
                 <div>
                   <p className="text-[14px] font-medium text-ink">
-                    {fmt(c.date, "EEEE d MMM yyyy")}
+                    {range.start === range.end
+                      ? fmt(range.start, "EEEE d MMM yyyy")
+                      : `${fmt(range.start, "EEE d MMM")} – ${fmt(range.end, "EEE d MMM yyyy")}`}
+                    {range.dates.length > 1 && (
+                      <span className="text-ink/45 font-normal ml-2">
+                        ({range.dates.length} days)
+                      </span>
+                    )}
                   </p>
-                  {c.note && (
-                    <p className="text-[13px] italic text-ink/55">{c.note}</p>
+                  {range.note && (
+                    <p className="text-[13px] italic text-ink/55">
+                      {range.note}
+                    </p>
                   )}
                 </div>
-                <form action={removeClosureAction.bind(null, c.date)}>
+                <form action={removeClosuresAction.bind(null, range.dates)}>
                   <button
                     type="submit"
                     className="text-[11px] tracking-[0.1em] uppercase text-burgundy hover:underline cursor-pointer"

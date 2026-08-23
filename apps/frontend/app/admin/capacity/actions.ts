@@ -4,13 +4,18 @@ import { revalidatePath } from "next/cache"
 
 import { isAdmin } from "@/lib/auth/admin"
 import {
-  addClosure,
-  removeClosure,
+  addClosures,
+  removeClosures,
   removeOverride,
   setPoolMax,
   upsertOverride,
 } from "@/lib/capacity/admin"
-import { isDateKey, parseMaxItems, weekStartOf } from "@/lib/capacity/week"
+import {
+  expandDateRange,
+  isDateKey,
+  parseMaxItems,
+  weekStartOf,
+} from "@/lib/capacity/week"
 import { createClient } from "@/lib/supabase/server"
 
 export interface FormState {
@@ -88,24 +93,46 @@ export async function removeOverrideAction(
 
 // ── Closures ──────────────────────────────────────────────────────────────────
 
+// Guards a fat-fingered range from closing months of the calendar at once.
+const MAX_CLOSURE_SPAN_DAYS = 120
+
 export async function addClosureAction(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
   if (!(await requireAdmin())) return { ok: false, error: "Not authorised." }
 
-  const date = String(formData.get("date") ?? "")
+  const from = String(formData.get("from") ?? "")
+  const toRaw = String(formData.get("to") ?? "").trim()
   const note = String(formData.get("note") ?? "").trim() || null
-  if (!isDateKey(date)) return { ok: false, error: "Choose a date to close." }
 
-  const result = await addClosure(date, note)
+  if (!isDateKey(from)) return { ok: false, error: "Choose a start date." }
+  const to = toRaw || from
+  if (!isDateKey(to)) return { ok: false, error: "That end date isn't valid." }
+  if (to < from) {
+    return { ok: false, error: "The end date is before the start date." }
+  }
+
+  const dates = expandDateRange(from, to)
+  if (dates.length > MAX_CLOSURE_SPAN_DAYS) {
+    return {
+      ok: false,
+      error: `That's ${dates.length} days — close at most ${MAX_CLOSURE_SPAN_DAYS} at once.`,
+    }
+  }
+
+  const result = await addClosures(dates, note)
   if (!result.ok) return { ok: false, error: result.error }
   refresh()
-  return { ok: true, message: "Date closed" }
+  return {
+    ok: true,
+    message:
+      dates.length === 1 ? "Date closed" : `${dates.length} dates closed`,
+  }
 }
 
-export async function removeClosureAction(date: string): Promise<void> {
+export async function removeClosuresAction(dates: string[]): Promise<void> {
   if (!(await requireAdmin())) return
-  await removeClosure(date)
+  await removeClosures(dates)
   refresh()
 }

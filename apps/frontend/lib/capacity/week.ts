@@ -1,4 +1,4 @@
-import { format, parseISO, startOfWeek } from "date-fns"
+import { addDays, format, parseISO, startOfWeek } from "date-fns"
 
 /**
  * Week and weekday helpers for the capacity editor. Pure, client-safe.
@@ -67,4 +67,51 @@ export function isDateKey(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
   const d = parseISO(value)
   return !Number.isNaN(d.getTime())
+}
+
+/** Every `yyyy-MM-dd` from `from` to `to` inclusive. `[]` if `to` is before `from`. */
+export function expandDateRange(from: string, to: string): string[] {
+  const start = parseISO(from)
+  const end = parseISO(to)
+  const out: string[] = []
+  for (let d = start; d <= end; d = addDays(d, 1)) {
+    out.push(format(d, "yyyy-MM-dd"))
+  }
+  return out
+}
+
+export interface ClosureRange {
+  start: string
+  end: string
+  note: string | null
+  dates: string[]
+}
+
+/**
+ * Collapse per-date closures into contiguous ranges so a two-week holiday reads
+ * (and reopens) as one span, not fourteen rows. A run breaks on a gap in dates
+ * or a change of note.
+ */
+export function groupClosures(
+  closures: { date: string; note: string | null }[]
+): ClosureRange[] {
+  const sorted = [...closures].sort((a, b) => a.date.localeCompare(b.date))
+  const groups: ClosureRange[] = []
+
+  for (const c of sorted) {
+    const last = groups[groups.length - 1]
+    const followsLast =
+      last &&
+      last.note === c.note &&
+      format(addDays(parseISO(last.end), 1), "yyyy-MM-dd") === c.date
+
+    if (followsLast) {
+      last.end = c.date
+      last.dates.push(c.date)
+    } else {
+      groups.push({ start: c.date, end: c.date, note: c.note, dates: [c.date] })
+    }
+  }
+
+  return groups
 }

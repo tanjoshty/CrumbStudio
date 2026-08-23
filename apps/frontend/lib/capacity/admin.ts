@@ -181,21 +181,28 @@ export async function removeOverride(
   return { ok: true }
 }
 
-export async function addClosure(
-  date: string,
+/** Close one or more dates. Per-date rows (the model is unchanged); a range is
+ *  just many rows written in one upsert. */
+export async function addClosures(
+  dates: string[],
   note: string | null
 ): Promise<WriteResult> {
+  if (dates.length === 0) return { ok: false, error: "No dates to close." }
   const db = createAdminClient()
   const { error } = await db
     .from("date_closure")
-    .upsert({ date, note }, { onConflict: "date" })
+    .upsert(
+      dates.map((date) => ({ date, note })),
+      { onConflict: "date" }
+    )
   if (error) return { ok: false, error: error.message }
   return { ok: true }
 }
 
-export async function removeClosure(date: string): Promise<WriteResult> {
+export async function removeClosures(dates: string[]): Promise<WriteResult> {
+  if (dates.length === 0) return { ok: true }
   const db = createAdminClient()
-  const { error } = await db.from("date_closure").delete().eq("date", date)
+  const { error } = await db.from("date_closure").delete().in("date", dates)
   if (error) return { ok: false, error: error.message }
   return { ok: true }
 }
