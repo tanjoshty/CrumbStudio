@@ -210,3 +210,24 @@ source changes.
 
 Keep the page-level check in `app/admin/page.tsx` as a fallback — `proxy.ts` is
 the gate, not the only lock.
+
+### C8 — Refund policy: always full, 72h not enforced *(decided 2026-08-23)*
+
+Cancelling a paid order (`confirmed` / `in_progress` / `ready`) issues a **full**
+Stripe refund, always, regardless of how close to the fulfilment date it is
+(`lib/orders/refund.ts`, called before the status flip in `updateOrderStatus`).
+
+**The "Cancellations accepted up to 72 hours before your date" line is
+customer-facing copy only — nothing in the code enforces it.** The baker can
+cancel and fully refund any order at any time.
+
+**Deferred (not built):** tying the refund amount to the 72-hour window — e.g.
+full if ≥72h before the date, partial or none if inside it — and any partial /
+enter-an-amount refund. Chosen over the alternatives ("admin picks full/none",
+"enter an amount") to keep the money path simple for one baker. Revisit when
+late cancellations start costing real ingredients.
+
+If/when it's built, it needs a product rule (what a sub-72h cancellation
+refunds), the hours-to-earliest-`fulfillment_date` computation, the amount shown
+in the cancel dialog, and a goodwill override. `refundOrder` already takes an
+order id and does a full refund; a partial would add an `amount` argument.

@@ -115,7 +115,9 @@ Shipped in its own branch/PR (`feat/refund-on-cancel`), kept out of 6a so the
 money path got isolated review.
 
 - **Always a full refund** on cancelling a paid order (`refundOrder` in
-  `lib/orders/refund.ts`; no `amount` = full). No partial/late logic yet.
+  `lib/orders/refund.ts`; no `amount` = full). No partial/late logic yet — the
+  72-hour policy is customer copy, not enforced; see
+  [C8](./README.md#c8--refund-policy-always-full-72h-not-enforced-decided-2026-08-23).
 - The `payment_intent` id isn't persisted — retrieved from the order's
   `stripe_session_id` at cancel time (`session.payment_intent`).
 - **Idempotent** two ways: a `refunded_at` short-circuit, and a
