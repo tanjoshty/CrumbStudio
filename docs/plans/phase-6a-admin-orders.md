@@ -109,6 +109,24 @@ the state machine just has to allow it and nothing else.
 - `proxy.ts` (role check)
 - `lib/orders/service.ts` (extend: validated transition + cancel)
 
+## Follow-up (separate PR): refund on cancel
+
+**Decided 2026-08-23.** 6a's cancel frees capacity but does **not** touch Stripe —
+a paid order stays charged, and the cancel dialog says so explicitly. A focused
+follow-up PR adds the refund, kept out of 6a so the money path gets isolated
+review:
+
+- **Always a full refund** on cancelling a paid order (`confirmed` / `in_progress`
+  / `ready`). No partial/late-cancellation logic yet.
+- The `payment_intent` id isn't persisted — retrieve it from the order's
+  `stripe_session_id` at cancel time (`session.payment_intent`), then create the
+  refund.
+- **Idempotent**: a refund idempotency key (e.g. `refund-<orderId>`) so a
+  double-click or retry never double-refunds. Record `refunded_at` /
+  `stripe_refund_id` on `"order"` (new columns → manual `ALTER`).
+- **Refund before cancel**: if the refund fails, do not flip to `cancelled` —
+  surface the error so there's never a silent "cancelled but not refunded".
+
 ## Done when
 
 - A confirmed order appears in the queue on its fulfilment date.
