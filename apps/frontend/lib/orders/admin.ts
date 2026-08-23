@@ -63,6 +63,7 @@ export interface OrderDetail {
   deliveryAddress: string | null
   customerEmail: string | null
   customerPhone: string | null
+  refundedAt: string | null
   items: OrderDetailItem[]
 }
 
@@ -172,7 +173,7 @@ export async function getOrderDetail(id: string): Promise<OrderDetail | null> {
   const { data: order, error } = await db
     .from("order")
     .select(
-      "id, status, total, created_at, fulfillment_type, delivery_address, customer:customer_id(email, phone_number), order_item(id, sanity_product_id, variations, quantity, unit_price, fulfillment_date, notes)"
+      "id, status, total, created_at, fulfillment_type, delivery_address, refunded_at, customer:customer_id(email, phone_number), order_item(id, sanity_product_id, variations, quantity, unit_price, fulfillment_date, notes)"
     )
     .eq("id", id)
     .maybeSingle()
@@ -204,6 +205,7 @@ export async function getOrderDetail(id: string): Promise<OrderDetail | null> {
     deliveryAddress: order.delivery_address ?? null,
     customerEmail: customer?.email ?? null,
     customerPhone: customer?.phone_number ?? null,
+    refundedAt: order.refunded_at ?? null,
     items: itemRows
       .map((row) => {
         const v = (row.variations ?? {}) as Variations
